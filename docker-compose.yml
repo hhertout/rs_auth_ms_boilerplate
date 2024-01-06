@@ -1,0 +1,32 @@
+services:
+  mailer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 4000:4567
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
+
+
+  pgsql:
+    container_name: postgresql
+    image: postgres:latest
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d blueprint -U postgres" ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    env_file:
+      - ./db.env
+    ports:
+      - "5433:5432"
+    volumes:
+      - psql_volume:/var/lib/postgresql/data
+
+volumes:
+  psql_volume:
