@@ -10,11 +10,17 @@ pub struct AppState {
 }
 
 pub async fn serve() -> Router {
+    let state = AppState {
+        repository: Arc::from(Repository::new().await)
+    };
+
+    let api = Router::new()
+        .route("/user/new", post(controllers::user_controller::save_user))
+        .route("/user/find-one", get(controllers::user_controller::get_user_by_email))
+        .route("/login", post(controllers::auth_controller::login));
+
     Router::new()
         .route("/ping", get(controllers::ping))
-        .route("/api/user/save", post(controllers::user_controller::save_user))
-
-        .with_state(AppState {
-            repository: Arc::from(Repository::new().await)
-        })
+        .nest("/api", api)
+        .with_state(state)
 }

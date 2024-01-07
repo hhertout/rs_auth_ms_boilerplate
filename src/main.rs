@@ -1,5 +1,6 @@
 use axum::Router;
 use tokio::net::TcpListener;
+use crate::database::Database;
 
 mod services;
 mod api;
@@ -11,8 +12,10 @@ mod database;
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    let app: Router = api::serve().await;
 
+    Database::new().migrations_migrate().await;
+
+    let app: Router = api::serve().await;
     let listener = TcpListener::bind("0.0.0.0:4000")
         .await
         .unwrap();
