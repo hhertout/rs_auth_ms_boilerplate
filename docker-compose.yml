@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - 4000:4567
+      - 4500:4000
     volumes:
-      - .:/usr/src/app
+      - .:/app
     env_file:
       - .env
 
@@ -17,7 +17,7 @@ services:
     image: postgres:latest
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d blueprint -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -d auth_api -U postgres" ]
       interval: 30s
       timeout: 5s
       retries: 10

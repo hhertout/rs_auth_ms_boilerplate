@@ -1,24 +1,22 @@
-use axum::{Json, Router};
-use axum::routing::get;
-use serde::{Deserialize, Serialize};
+use axum::Router;
+use tokio::net::TcpListener;
 
-#[derive(Serialize, Deserialize)]
-struct Message {
-    message: String,
-}
+mod services;
+mod api;
+mod repository;
+mod controllers;
+mod database;
 
-async fn handler() -> Json<Message> {
-    let message = Message { message: String::from("toto") };
-    return Json(message);
-}
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/", get(handler));
+    env_logger::init();
+    let app: Router = api::serve().await;
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:4000")
+    let listener = TcpListener::bind("0.0.0.0:4000")
         .await
         .unwrap();
+
     println!("📡 Server started ! Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
