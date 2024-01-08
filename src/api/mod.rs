@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use axum::Router;
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use crate::{controllers};
 use crate::repository::Repository;
 
@@ -17,6 +17,7 @@ pub async fn serve() -> Router {
     let api = Router::new()
         .route("/user/new", post(controllers::user_controller::save_user))
         .route("/user/find-one", get(controllers::user_controller::get_user_by_email))
+        .route("/user/password/update", patch(controllers::user_controller::update_password))
         .route("/login", post(controllers::auth_controller::login));
 
     Router::new()

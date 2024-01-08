@@ -36,7 +36,7 @@ impl Repository {
             .await
     }
 
-    pub async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
+    pub async fn find_user_by_email(&self, email: &str) -> Result<User, Error> {
         sqlx::query_as::<_, User>("\
         SELECT id, email, password \
         FROM public.user \
@@ -46,5 +46,14 @@ impl Repository {
             .bind(email)
             .fetch_one(&self.db_pool)
             .await
+    }
+
+    pub async fn update_user_password(&self, user_id: &str, password: &str) -> Result<bool, Error> {
+        let res = sqlx::query("UPDATE public.user SET password=$1 WHERE id=$2")
+            .bind(password)
+            .bind(user_id)
+            .execute(&self.db_pool)
+            .await?;
+        Ok(res.rows_affected() == 1)
     }
 }

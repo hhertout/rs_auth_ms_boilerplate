@@ -1,6 +1,8 @@
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{StatusCode};
+use axum::http::header::SET_COOKIE;
 use axum::Json;
+use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
@@ -19,8 +21,8 @@ pub struct LoginResponse {
     token: String,
 }
 
-pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Result<Json<LoginResponse>, (StatusCode, Json<CustomResponse>)> {
-    let user = match state.repository.get_user_by_email(&body.email).await {
+pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    let user = match state.repository.find_user_by_email(&body.email).await {
         Ok(user) => user,
         Err(_) => {
             return Err((
@@ -60,12 +62,14 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
                 Json(CustomResponse {
                     message: err.to_string(),
                 }),
-            ))
+            ));
         }
     };
 
-    Ok(Json(LoginResponse {
-        token,
-        email: user.email
-    }))
+    let response = (
+        [(SET_COOKIE, format!("token={}", token))], // headers
+        Json(CustomResponse { message: String::from("Successfully logged in !") }) // body
+    ).into_response();
+
+    Ok(response)
 }
