@@ -3,6 +3,7 @@ use axum::http::{StatusCode};
 use axum::http::header::SET_COOKIE;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
+use cookie::SameSite;
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
@@ -66,8 +67,15 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
         }
     };
 
+    let cookie = cookie::Cookie::build(("Authorization", token))
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::Strict)
+        .build();
+
     let response = (
-        [(SET_COOKIE, format!("token={}", token))], // headers
+        [(SET_COOKIE, cookie.to_string())], // headers
         Json(CustomResponse { message: String::from("Successfully logged in !") }) // body
     ).into_response();
 
