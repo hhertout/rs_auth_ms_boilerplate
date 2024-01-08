@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::http::{StatusCode};
+use axum::http::{HeaderMap, StatusCode};
 use axum::http::header::SET_COOKIE;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
@@ -80,4 +80,46 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
     ).into_response();
 
     Ok(response)
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CheckTokenBody {
+    token: String,
+}
+
+pub async fn check_token(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+    let token = match headers.get("Authorization") {
+        Some(t) => t.to_str().unwrap(),
+        None => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CustomResponse {
+                    message: String::from("Unauthorized"),
+                }),
+            ));
+        }
+    };
+    let claims = match services::crypto::verify_jwt(token.to_owned()) {
+        Ok(c) => c,
+        Err(err) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CustomResponse {
+                    message: err.to_string(),
+                }),
+            ));
+        }
+    };
+
+    match state.repository.find_user_by_email(&claims.sub).await {
+        Ok(_) => Ok(Json(CustomResponse {
+            message: String::from("JWT is valid")
+        })),
+        Err(_) => Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            }),
+        ))
+    }
 }
