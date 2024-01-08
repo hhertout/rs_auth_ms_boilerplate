@@ -2,7 +2,8 @@ use std::env;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{Error, SaltString};
-use jsonwebtoken::{encode, EncodingKey, Header, Algorithm};
+use chrono::Utc;
+use jsonwebtoken::{encode, EncodingKey, Header, Algorithm, decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 pub fn hash_password(password: &str) -> Result<String, Error> {
