@@ -24,6 +24,7 @@ pub async fn serve() -> Router {
         .route("/user/ban", delete(user_controller::soft_delete_user))
         .route("/user/unban", patch(user_controller::remove_soft_deletion_user))
         .route("/user/delete", delete(user_controller::hard_delete_user))
+        .route("/user/progression", get(user_controller::get_user_progression))
         .route("/login", post(auth_controller::login))
         .route("/logout", get(auth_controller::logout));
 

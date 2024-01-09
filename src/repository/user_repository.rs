@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, FromRow};
 use crate::repository::Repository;
@@ -19,6 +20,12 @@ pub struct User {
 pub struct NewUserResponse {
     id: String,
     email: String,
+}
+
+#[derive(FromRow, Serialize, Deserialize)]
+pub struct UserProgression {
+    pub creation_date: NaiveDate,
+    pub incr_count: i32
 }
 
 impl Repository {
@@ -95,5 +102,11 @@ impl Repository {
             .await?;
 
         self.is_row_affected(res.rows_affected(), 1)
+    }
+
+    pub async fn get_v_user_progression(&self) -> Result<Vec<UserProgression>, Error> {
+        sqlx::query_as::<_, UserProgression>("SELECT * FROM v_user_progression")
+            .fetch_all(&self.db_pool)
+            .await
     }
 }

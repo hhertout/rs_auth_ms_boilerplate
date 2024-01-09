@@ -1,6 +1,7 @@
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
@@ -178,6 +179,18 @@ pub async fn hard_delete_user(State(state): State<AppState>, Json(body): Json<De
         Ok(_) => Ok(Json(CustomResponse {
             message: String::from("User deleted successfully !")
         })),
+        Err(err) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(CustomResponse {
+                message: err.to_string(),
+            })
+        ))
+    }
+}
+
+pub async fn get_user_progression(State(state): State<AppState>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    match state.repository.get_v_user_progression().await {
+        Ok(res) => Ok(Json(res).into_response()),
         Err(err) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(CustomResponse {
