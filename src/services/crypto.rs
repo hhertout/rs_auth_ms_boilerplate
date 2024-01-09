@@ -40,12 +40,12 @@ pub fn generate_jwt(email: &str) -> Result<String, jsonwebtoken::errors::Error> 
     encode(&header, &my_claims, &EncodingKey::from_secret(secret.as_bytes()))
 }
 
-pub fn verify_jwt(token: String) -> Result<Claims, jsonwebtoken::errors::Error> {
+pub fn verify_jwt(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     let secret = env::var("JWT_SECRET")
         .unwrap_or_else(|_| panic!("JWT_SECRET env variable is required"));
 
     decode::<Claims>(
-        &token,
+        token,
         &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::new(Algorithm::HS512),
     ).map(|data| data.claims)

@@ -17,6 +17,7 @@ pub async fn serve() -> Router {
 
     let api = Router::new()
         .route("/auth/check-token", get(auth_controller::check_token))
+        .route("/auth/check-cookie", get(auth_controller::check_cookie))
         .route("/user/new", post(user_controller::save_user))
         .route("/user/find-one", get(user_controller::get_user_by_email))
         .route("/user/password/update", patch(user_controller::update_password))
