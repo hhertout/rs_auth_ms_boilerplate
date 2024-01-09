@@ -127,27 +127,10 @@ pub async fn check_token(State(state): State<AppState>, headers: HeaderMap) -> R
     }
 }
 
-pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
-    let cookie = match headers.get("cookie") {
-        Some(c) => match c.to_str() {
-            Ok(c) => c,
-            Err(err) => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(CustomResponse {
-                        message: err.to_string(),
-                    }),
-                ));
-            }
-        },
-        None => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: String::from("Unauthorized"),
-                }),
-            ));
-        }
+pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    let cookie = match extract_auth_cookie(headers) {
+        Ok(c) => c,
+        Err(err) => return err,
     };
 
     let token = match cookie::Cookie::parse(cookie) {
@@ -177,7 +160,7 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
     match state.repository.find_user_by_email(&claims.sub).await {
         Ok(_) => Ok(Json(CustomResponse {
             message: String::from("Authorized")
-        })),
+        }).into_response()),
         Err(_) => Err((
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
@@ -188,26 +171,9 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
 }
 
 pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
-    let cookie = match headers.get("cookie") {
-        Some(c) => match c.to_str() {
-            Ok(c) => c,
-            Err(err) => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(CustomResponse {
-                        message: err.to_string(),
-                    }),
-                ));
-            }
-        },
-        None => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: String::from("Unauthorized"),
-                }),
-            ));
-        }
+    let cookie = match extract_auth_cookie(headers) {
+        Ok(c) => c,
+        Err(err) => return err,
     };
 
     let token = match cookie::Cookie::parse(cookie) {
@@ -248,4 +214,30 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
     ).into_response();
 
     Ok(response)
+}
+
+fn extract_auth_cookie(headers: HeaderMap) -> Result<String, Result<Response, (StatusCode, Json<CustomResponse>)>> {
+    let cookie = match headers.get("cookie") {
+        Some(c) => match c.to_str() {
+            Ok(c) => c,
+            Err(err) => {
+                return Err(Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(CustomResponse {
+                        message: err.to_string(),
+                    }),
+                )));
+            }
+        },
+        None => {
+            return Err(Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CustomResponse {
+                    message: String::from("Unauthorized"),
+                }),
+            )));
+        }
+    };
+
+    Ok(cookie.to_owned())
 }
