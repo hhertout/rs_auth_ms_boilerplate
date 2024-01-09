@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{Error, Pool, Postgres};
 use crate::database::Database;
 
 pub mod user_repository;
@@ -13,6 +13,14 @@ impl Repository {
         let db = Database::new();
         Repository {
             db_pool: db.database_connection().await
+        }
+    }
+
+    fn is_row_affected(&self, row_nb: u64, expected: u64) -> Result<(), Error> {
+        if row_nb == expected {
+            Ok(())
+        } else {
+            Err(Error::RowNotFound)
         }
     }
 }
