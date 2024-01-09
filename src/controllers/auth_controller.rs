@@ -3,7 +3,8 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::http::header::SET_COOKIE;
 use axum::{Json};
 use axum::response::{IntoResponse, Response};
-use cookie::SameSite;
+use cookie::{Expiration, SameSite};
+use cookie::time::{Duration, OffsetDateTime};
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
@@ -67,11 +68,13 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
         }
     };
 
+    let expiration_date = OffsetDateTime::now_utc() + Duration::days(20);
     let cookie = cookie::Cookie::build(("Authorization", token))
         .path("/")
         .secure(true)
         .http_only(true)
         .same_site(SameSite::Strict)
+        .expires(Expiration::DateTime(expiration_date))
         .build();
 
     let response = (
@@ -182,4 +185,67 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
             }),
         ))
     }
+}
+
+pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    let cookie = match headers.get("cookie") {
+        Some(c) => match c.to_str() {
+            Ok(c) => c,
+            Err(err) => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(CustomResponse {
+                        message: err.to_string(),
+                    }),
+                ));
+            }
+        },
+        None => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CustomResponse {
+                    message: String::from("Unauthorized"),
+                }),
+            ));
+        }
+    };
+
+    let token = match cookie::Cookie::parse(cookie) {
+        Ok(t) => t,
+        Err(err) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(CustomResponse {
+                    message: err.to_string(),
+                }),
+            ));
+        }
+    };
+
+    match services::crypto::verify_jwt(token.value()) {
+        Ok(c) => c,
+        Err(err) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(CustomResponse {
+                    message: err.to_string(),
+                }),
+            ));
+        }
+    };
+
+    let cookie = cookie::Cookie::build(("Authorization", ""))
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::Strict)
+        .expires(OffsetDateTime::now_utc())
+        .build();
+
+    let response = (
+        [(SET_COOKIE, cookie.to_string())], // headers
+        Json(CustomResponse { message: String::from("Successfully logged out !") }) // body
+    ).into_response();
+
+    Ok(response)
 }
