@@ -19,6 +19,7 @@ impl Database {
             .unwrap_or_else(|_| panic!("Failed to connect to database. {}", db_url))
     }
 
+    #[allow(dead_code)]
     pub async fn migrations_migrate(&self) {
         let _ = &self.create_database().await;
         let pool = &self.database_connection().await;
@@ -28,6 +29,7 @@ impl Database {
             .unwrap_or_else(|err| panic!("Migration failed : {:?}", err))
     }
 
+    #[allow(dead_code)]
     async fn create_database(&self) {
         let db_url = env::var("DB_URL").unwrap();
         if !Postgres::database_exists(&db_url).await.unwrap_or(false) {
