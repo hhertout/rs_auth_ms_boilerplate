@@ -8,8 +8,8 @@ use crate::controllers::CustomResponse;
 use crate::repository::user_repository::{NewUser, NewUserResponse};
 use crate::services::crypto::hash_password;
 
-pub async fn save_user(State(state): State<AppState>, Json(mut body): Json<NewUser>) -> Result<Json<NewUserResponse>, (StatusCode, Json<CustomResponse>)> {
-    body.password = match hash_password(&body.password) {
+pub async fn save_user(State(state): State<AppState>, Json(mut user): Json<NewUser>) -> Result<Json<NewUserResponse>, (StatusCode, Json<CustomResponse>)> {
+    user.password = match hash_password(&user.password) {
         Ok(h) => h,
         Err(err) => {
             return Err((
@@ -21,7 +21,7 @@ pub async fn save_user(State(state): State<AppState>, Json(mut body): Json<NewUs
         }
     };
 
-    let res = state.repository.save_user(body).await;
+    let res = state.repository.save_user(user).await;
     match res {
         Ok(new_user) => Ok(Json(new_user)),
         Err(err) => Err((

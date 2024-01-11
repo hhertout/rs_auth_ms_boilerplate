@@ -17,12 +17,6 @@ pub struct LoginBody {
     password: String,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct LoginResponse {
-    email: String,
-    token: String,
-}
-
 pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
     let user = match state.repository.find_user_by_email(&body.email).await {
         Ok(user) => user,
@@ -216,6 +210,7 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
     Ok(response)
 }
 
+#[allow(dead_code)]
 fn extract_auth_cookie(headers: HeaderMap) -> Result<String, Result<Response, (StatusCode, Json<CustomResponse>)>> {
     let cookie = match headers.get("cookie") {
         Some(c) => match c.to_str() {
