@@ -18,29 +18,24 @@ pub struct LoginBody {
 }
 
 pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
-    let user = match state.repository.find_user_by_email(&body.email).await {
-        Ok(user) => user,
-        Err(_) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(CustomResponse {
-                    message: String::from("Check your information"),
-                }),
-            ));
-        }
-    };
+    let user = state.repository
+        .find_user_by_email(&body.email)
+        .await
+        .map_err(|_| (
+            StatusCode::BAD_REQUEST,
+            Json(CustomResponse {
+                message: String::from("Check your information"),
+            }),
+        ))?;
 
-    let matching_res = match services::crypto::check_password(&body.password, &user.password) {
-        Ok(matching_res) => matching_res,
-        Err(_) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(CustomResponse {
-                    message: String::from("Check your information"),
-                }),
-            ));
-        }
-    };
+    let matching_res = services::crypto::check_password(&body.password, &user.password)
+        .map_err(|_| (
+            StatusCode::BAD_REQUEST,
+            Json(CustomResponse {
+                message: String::from("Check your information"),
+            }),
+        ))?;
+
     if !matching_res {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -50,17 +45,12 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
         ));
     }
 
-    let token = match generate_jwt(&user.email) {
-        Ok(t) => t,
-        Err(err) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    let token = generate_jwt(&user.email).map_err(|err| (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(CustomResponse {
+            message: err.to_string(),
+        }),
+    ))?;
 
     let expiration_date = OffsetDateTime::now_utc() + Duration::days(20);
     let cookie = cookie::Cookie::build(("Authorization", token))
@@ -96,29 +86,27 @@ pub async fn check_token(State(state): State<AppState>, headers: HeaderMap) -> R
             ));
         }
     };
-    let claims = match services::crypto::verify_jwt(token) {
-        Ok(c) => c,
-        Err(err) => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    let claims = services::crypto::verify_jwt(token)
+        .map_err(|err| (
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: err.to_string(),
+            }),
+        ))?;
 
-    match state.repository.find_user_by_email(&claims.sub).await {
-        Ok(_) => Ok(Json(CustomResponse {
-            message: String::from("Authorized")
-        })),
-        Err(_) => Err((
+    state.repository
+        .find_user_by_email(&claims.sub)
+        .await
+        .map_err(|_| (
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
                 message: String::from("Unauthorized"),
             }),
-        ))
-    }
+        ))?;
+
+    Ok(Json(CustomResponse {
+        message: String::from("Authorized")
+    }))
 }
 
 pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
@@ -127,41 +115,33 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
         Err(err) => return err,
     };
 
-    let token = match cookie::Cookie::parse(cookie) {
-        Ok(t) => t,
-        Err(err) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    let token = cookie::Cookie::parse(cookie)
+        .map_err(|err| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(CustomResponse {
+                message: err.to_string(),
+            }),
+        ))?;
 
-    let claims = match services::crypto::verify_jwt(token.value()) {
-        Ok(c) => c,
-        Err(err) => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    let claims = services::crypto::verify_jwt(token.value())
+        .map_err(|err| (
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: err.to_string(),
+            }),
+        ))?;
 
-    match state.repository.find_user_by_email(&claims.sub).await {
-        Ok(_) => Ok(Json(CustomResponse {
-            message: String::from("Authorized")
-        }).into_response()),
-        Err(_) => Err((
+    state.repository.find_user_by_email(&claims.sub).await
+        .map_err(|_| (
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
                 message: String::from("Unauthorized"),
-            }),
-        ))
-    }
+            })
+        ))?;
+
+    Ok(Json(CustomResponse {
+        message: String::from("Authorized")
+    }).into_response())
 }
 
 pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
@@ -170,29 +150,20 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
         Err(err) => return err,
     };
 
-    let token = match cookie::Cookie::parse(cookie) {
-        Ok(t) => t,
-        Err(err) => {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    let token = cookie::Cookie::parse(cookie).map_err(|err| (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(CustomResponse {
+            message: err.to_string(),
+        }),
+    ))?;
 
-    match services::crypto::verify_jwt(token.value()) {
-        Ok(c) => c,
-        Err(err) => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: err.to_string(),
-                }),
-            ));
-        }
-    };
+    services::crypto::verify_jwt(token.value())
+        .map_err(|err| (
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: err.to_string(),
+            }),
+        ))?;
 
     let cookie = cookie::Cookie::build(("Authorization", ""))
         .path("/")
