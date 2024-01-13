@@ -1,6 +1,5 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::{Error, FromRow};
 use crate::repository::Repository;
 
@@ -41,7 +40,7 @@ impl Repository {
         )
             .bind(user.email)
             .bind(user.password)
-            .bind(json!(user.role))
+            .bind(user.role)
             .fetch_one(&self.db_pool)
             .await
     }

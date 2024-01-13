@@ -3,6 +3,7 @@ use sqlx::{Pool, Postgres};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::postgres::PgPoolOptions;
 
+#[allow(async_fn_in_trait)]
 pub trait Database {
     async fn database_connection(&self) -> Pool<Postgres>;
     async fn migrations_migrate(&self);

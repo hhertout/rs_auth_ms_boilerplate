@@ -4,15 +4,18 @@ use axum::routing::{delete, get, patch, post};
 use crate::{controllers};
 use crate::controllers::{auth_controller, user_controller};
 use crate::repository::Repository;
+use crate::services::access_control::AccessControl;
 
 #[derive(Clone)]
 pub struct AppState {
     pub(crate) repository: Arc<Repository>,
+    pub(crate) access_control: Arc<AccessControl>
 }
 
 pub async fn serve() -> Router {
     let state = AppState {
-        repository: Arc::from(Repository::new().await)
+        repository: Arc::from(Repository::new().await),
+        access_control: Arc::from(AccessControl::new().await),
     };
 
     let api = Router::new()

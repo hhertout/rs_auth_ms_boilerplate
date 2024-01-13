@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
 use crate::services::crypto::{HashService, JwtService};
+use cookie::Cookie;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginBody {
@@ -111,10 +112,10 @@ pub async fn check_token(State(state): State<AppState>, headers: HeaderMap) -> R
 pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
     let cookie = match extract_auth_cookie(headers) {
         Ok(c) => c,
-        Err(err) => return err,
+        Err(err) => return Err(err),
     };
 
-    let token = cookie::Cookie::parse(cookie)
+    let token = Cookie::parse(cookie)
         .map_err(|err| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(CustomResponse {
@@ -146,10 +147,10 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
 pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
     let cookie = match extract_auth_cookie(headers) {
         Ok(c) => c,
-        Err(err) => return err,
+        Err(err) => return Err(err),
     };
 
-    let token = cookie::Cookie::parse(cookie).map_err(|err| (
+    let token = Cookie::parse(cookie).map_err(|err| (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(CustomResponse {
             message: err.to_string(),
@@ -164,7 +165,7 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
             }),
         ))?;
 
-    let cookie = cookie::Cookie::build(("Authorization", ""))
+    let cookie = Cookie::build(("Authorization", ""))
         .path("/")
         .secure(true)
         .http_only(true)
@@ -181,27 +182,25 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
 }
 
 #[allow(dead_code)]
-fn extract_auth_cookie(headers: HeaderMap) -> Result<String, Result<Response, (StatusCode, Json<CustomResponse>)>> {
-    let cookie = match headers.get("cookie") {
-        Some(c) => match c.to_str() {
-            Ok(c) => c,
-            Err(err) => {
-                return Err(Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(CustomResponse {
-                        message: err.to_string(),
-                    }),
-                )));
-            }
-        },
-        None => {
-            return Err(Err((
-                StatusCode::UNAUTHORIZED,
-                Json(CustomResponse {
-                    message: String::from("Unauthorized"),
-                }),
-            )));
-        }
+pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusCode, Json<CustomResponse>)> {
+    let cookie_header = match headers.get("cookie") {
+        Some(c) => c,
+        None => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            }),
+        ))
+    };
+
+    let cookie= match cookie_header.to_str() {
+        Ok(c) => c,
+        Err(err) => return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(CustomResponse {
+                message: err.to_string(),
+            }),
+        ))
     };
 
     Ok(cookie.to_owned())

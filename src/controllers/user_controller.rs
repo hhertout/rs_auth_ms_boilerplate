@@ -1,17 +1,20 @@
 use axum::Json;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
+use crate::config::roles::Role;
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
 use crate::repository::user_repository::{NewUser, NewUserResponse};
+use crate::services::access_control::GrantAccess;
 use crate::services::crypto::HashService;
+use crate::services::access_control::Authorization::{Authorized, Unauthorized};
 
 #[derive(Serialize, Deserialize)]
 pub struct NewUserBody {
     email: String,
-    password: String
+    password: String,
 }
 
 pub async fn save_user(State(state): State<AppState>, Json(body): Json<NewUserBody>) -> Result<Json<NewUserResponse>, (StatusCode, Json<CustomResponse>)> {
@@ -23,10 +26,10 @@ pub async fn save_user(State(state): State<AppState>, Json(body): Json<NewUserBo
             })
         ))?;
 
-    let user  = NewUser {
+    let user = NewUser {
         email: body.email,
         password: hash,
-        role: vec![String::from("ROLE_USER")]
+        role: vec![Role::USER.to_string()],
     };
 
     let new_user = state.repository
@@ -115,18 +118,25 @@ pub struct DeleteUserRequest {
     email: String,
 }
 
-pub async fn soft_delete_user(State(state): State<AppState>, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
-    let user = match state.repository.find_user_by_email(&body.email).await {
-        Ok(u) => u,
-        Err(_) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(CustomResponse {
-                    message: String::from("This user doesn't exist"),
-                })
-            ));
-        }
-    };
+pub async fn soft_delete_user(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+    match state.access_control.with_cookie(headers, vec![Role::ADMIN]).await {
+        Authorized => {}
+        Unauthorized(_) => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            })
+        ))
+    }
+
+    let user = state.repository.find_user_by_email(&body.email)
+        .await
+        .map_err(|_| (
+            StatusCode::BAD_REQUEST,
+            Json(CustomResponse {
+                message: String::from("This user doesn't exist"),
+            })
+        ))?;
 
     match state.repository.soft_delete_user(&user.id).await {
         Ok(_) => Ok(Json(CustomResponse {
@@ -141,7 +151,17 @@ pub async fn soft_delete_user(State(state): State<AppState>, Json(body): Json<De
     }
 }
 
-pub async fn remove_soft_deletion_user(State(state): State<AppState>, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+pub async fn remove_soft_deletion_user(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+    match state.access_control.with_cookie(headers, vec![Role::ADMIN]).await {
+        Authorized => {}
+        Unauthorized(_) => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            })
+        ))
+    }
+
     let user = state.repository
         .find_banned_user_by_email(&body.email)
         .await
@@ -167,7 +187,17 @@ pub async fn remove_soft_deletion_user(State(state): State<AppState>, Json(body)
     }))
 }
 
-pub async fn hard_delete_user(State(state): State<AppState>, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+pub async fn hard_delete_user(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<DeleteUserRequest>) -> Result<Json<CustomResponse>, (StatusCode, Json<CustomResponse>)> {
+    match state.access_control.with_cookie(headers, vec![Role::ADMIN]).await {
+        Authorized => {}
+        Unauthorized(_) => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            })
+        ))
+    }
+
     let user = state.repository
         .find_user_by_email(&body.email)
         .await
@@ -193,7 +223,17 @@ pub async fn hard_delete_user(State(state): State<AppState>, Json(body): Json<De
     }))
 }
 
-pub async fn get_user_progression(State(state): State<AppState>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+pub async fn get_user_progression(State(state): State<AppState>, headers: HeaderMap) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    match state.access_control.with_cookie(headers, vec![Role::ADMIN]).await {
+        Authorized => {}
+        Unauthorized(_) => return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(CustomResponse {
+                message: String::from("Unauthorized"),
+            })
+        ))
+    }
+
     let res = state.repository
         .get_v_user_progression()
         .await

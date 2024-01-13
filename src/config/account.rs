@@ -1,3 +1,4 @@
+use crate::config::roles::Role;
 use crate::database::{DatabaseService, Database};
 
 pub async fn create_super_admin_account() {
@@ -11,7 +12,7 @@ pub async fn create_super_admin_account() {
     let _ = sqlx::query("INSERT INTO public.user(email, password, role) VALUES ($1, $2, $3) ON CONFLICT(email) DO NOTHING")
         .bind(email)
         .bind(password)
-        .bind(vec![String::from("ROLE_SUPER_ADMIN")])
+        .bind(vec![Role::SUPER_ADMIN.to_str()])
         .execute(&pool)
         .await;
 }
