@@ -5,13 +5,15 @@ CREATE TABLE IF NOT EXISTS "user"
     updated_at date             not null,
     deleted_at date,
     email      varchar(255)     not null unique,
-    password   varchar(255)     not null
+    password   varchar(255)     not null,
+    role       varchar(50)[]
 );
 
 ALTER TABLE IF EXISTS "user"
     ADD IF NOT EXISTS created_at date not null default now(),
     ADD IF NOT EXISTS updated_at date not null default now(),
-    ADD IF NOT EXISTS deleted_at date;
+    ADD IF NOT EXISTS deleted_at date,
+    ADD IF NOT EXISTS role varchar(50)[];
 
 CREATE OR REPLACE FUNCTION f_set_creation_date()
     RETURNS TRIGGER AS
