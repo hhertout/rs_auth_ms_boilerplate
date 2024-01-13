@@ -6,16 +6,28 @@ use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
 use crate::repository::user_repository::{NewUser, NewUserResponse};
-use crate::services::crypto::hash_password;
+use crate::services::crypto::HashService;
 
-pub async fn save_user(State(state): State<AppState>, Json(mut user): Json<NewUser>) -> Result<Json<NewUserResponse>, (StatusCode, Json<CustomResponse>)> {
-    user.password = hash_password(&user.password)
+#[derive(Serialize, Deserialize)]
+pub struct NewUserBody {
+    email: String,
+    password: String
+}
+
+pub async fn save_user(State(state): State<AppState>, Json(body): Json<NewUserBody>) -> Result<Json<NewUserResponse>, (StatusCode, Json<CustomResponse>)> {
+    let hash = HashService::hash_password(&body.password)
         .map_err(|err| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(CustomResponse {
                 message: err.to_string(),
             })
         ))?;
+
+    let user  = NewUser {
+        email: body.email,
+        password: hash,
+        role: vec![String::from("ROLE_USER")]
+    };
 
     let new_user = state.repository
         .save_user(user)
@@ -75,7 +87,7 @@ pub async fn update_password(State(state): State<AppState>, Json(body): Json<Cha
             })
         ))?;
 
-    let hash = hash_password(&body.password)
+    let hash = HashService::hash_password(&body.password)
         .map_err(|err| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(CustomResponse {

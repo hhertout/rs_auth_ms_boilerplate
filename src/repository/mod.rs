@@ -1,5 +1,5 @@
 use sqlx::{Error, Pool, Postgres};
-use crate::database::Database;
+use crate::database::{Database, DatabaseService};
 
 pub mod user_repository;
 
@@ -10,7 +10,7 @@ pub struct Repository {
 
 impl Repository {
     pub async fn new() -> Repository {
-        let db = Database::new();
+        let db = DatabaseService::new();
         Repository {
             db_pool: db.database_connection().await
         }

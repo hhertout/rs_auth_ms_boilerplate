@@ -1,19 +1,21 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::{Error, FromRow};
 use crate::repository::Repository;
 
-#[derive(Serialize, Deserialize)]
-pub struct NewUser {
-    email: String,
+#[derive(FromRow, Serialize, Deserialize)]
+pub struct User {
+    pub(crate) id: String,
+    pub(crate) email: String,
     pub(crate) password: String,
 }
 
-#[derive(FromRow, Serialize, Deserialize)]
-pub struct User {
-    pub id: String,
-    pub email: String,
-    pub password: String,
+#[derive(Serialize, Deserialize)]
+pub struct NewUser {
+    pub(crate) email: String,
+    pub(crate) password: String,
+    pub(crate) role: Vec<String>,
 }
 
 #[derive(FromRow, Serialize, Deserialize)]
@@ -24,21 +26,22 @@ pub struct NewUserResponse {
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct UserProgression {
-    pub creation_date: NaiveDate,
-    pub incr_count: i32
+    pub(crate) creation_date: NaiveDate,
+    pub(crate) incr_count: i32
 }
 
 impl Repository {
     pub async fn save_user(&self, user: NewUser) -> Result<NewUserResponse, Error> {
         sqlx::query_as::<_, NewUserResponse>(
             "\
-            INSERT INTO public.user (email, password) \
-            VALUES ($1, $2)\
+            INSERT INTO public.user (email, password, role) \
+            VALUES ($1, $2, $3)\
             RETURNING id, created_at, updated_at, deleted_at, email ;\
             "
         )
             .bind(user.email)
             .bind(user.password)
+            .bind(json!(user.role))
             .fetch_one(&self.db_pool)
             .await
     }

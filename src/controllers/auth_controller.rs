@@ -8,8 +8,7 @@ use cookie::time::{Duration, OffsetDateTime};
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
-use crate::services;
-use crate::services::crypto::generate_jwt;
+use crate::services::crypto::{HashService, JwtService};
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginBody {
@@ -28,7 +27,7 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
             }),
         ))?;
 
-    let matching_res = services::crypto::check_password(&body.password, &user.password)
+    let matching_res = HashService::check_password(&body.password, &user.password)
         .map_err(|_| (
             StatusCode::BAD_REQUEST,
             Json(CustomResponse {
@@ -45,7 +44,7 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
         ));
     }
 
-    let token = generate_jwt(&user.email).map_err(|err| (
+    let token = JwtService::generate_jwt(&user.email).map_err(|err| (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(CustomResponse {
             message: err.to_string(),
@@ -86,7 +85,7 @@ pub async fn check_token(State(state): State<AppState>, headers: HeaderMap) -> R
             ));
         }
     };
-    let claims = services::crypto::verify_jwt(token)
+    let claims = JwtService::verify_jwt(token)
         .map_err(|err| (
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
@@ -123,7 +122,7 @@ pub async fn check_cookie(State(state): State<AppState>, headers: HeaderMap) -> 
             }),
         ))?;
 
-    let claims = services::crypto::verify_jwt(token.value())
+    let claims = JwtService::verify_jwt(token.value())
         .map_err(|err| (
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
@@ -157,7 +156,7 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
         }),
     ))?;
 
-    services::crypto::verify_jwt(token.value())
+    JwtService::verify_jwt(token.value())
         .map_err(|err| (
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
