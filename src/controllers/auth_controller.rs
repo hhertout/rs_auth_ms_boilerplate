@@ -203,5 +203,17 @@ pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusC
         ))
     };
 
-    Ok(cookie.to_owned())
+    for cookie in cookie.split(';') {
+        if cookie.contains("Authorization") {
+            let token = cookie.trim();
+            return Ok(token.to_owned())
+        }
+    };
+
+    Err((
+        StatusCode::UNAUTHORIZED,
+        Json(CustomResponse {
+            message: String::from("Auth Cookie is not set"),
+        }),
+    ))
 }
