@@ -188,7 +188,7 @@ pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusC
         None => return Err((
             StatusCode::UNAUTHORIZED,
             Json(CustomResponse {
-                message: String::from("Unauthorized"),
+                message: String::from("Cookie is not set"),
             }),
         ))
     };

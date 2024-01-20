@@ -1,10 +1,14 @@
 use std::sync::Arc;
+use axum::http::{HeaderValue, Method};
+use axum::http::header::CONTENT_TYPE;
 use axum::Router;
 use axum::routing::{delete, get, patch, post};
 use crate::{controllers};
 use crate::controllers::{auth_controller, user_controller};
 use crate::repository::Repository;
 use crate::services::access_control::AccessControl;
+use tower_http::cors::{AllowCredentials, AllowHeaders, Any, CorsLayer};
+use crate::config;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,5 +38,6 @@ pub async fn serve() -> Router {
     Router::new()
         .route("/ping", get(controllers::ping))
         .nest("/api", api)
+        .layer(config::cors::cors_layer())
         .with_state(state)
 }
