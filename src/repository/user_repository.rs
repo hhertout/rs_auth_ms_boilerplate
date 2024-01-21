@@ -21,6 +21,7 @@ pub struct NewUser {
 pub struct NewUserResponse {
     id: String,
     email: String,
+    role: Vec<String>,
 }
 
 #[derive(FromRow, Serialize, Deserialize)]
@@ -35,7 +36,7 @@ impl Repository {
             "\
             INSERT INTO public.user (email, password, role) \
             VALUES ($1, $2, $3)\
-            RETURNING id, created_at, updated_at, deleted_at, email ;\
+            RETURNING id, created_at, updated_at, deleted_at, email, role;\
             "
         )
             .bind(user.email)
