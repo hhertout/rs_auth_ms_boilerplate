@@ -8,6 +8,7 @@ pub struct User {
     pub(crate) id: String,
     pub(crate) email: String,
     pub(crate) password: String,
+    pub(crate) role: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,7 +49,7 @@ impl Repository {
 
     pub async fn find_user_by_email(&self, email: &str) -> Result<User, Error> {
         sqlx::query_as::<_, User>("\
-        SELECT id, email, password \
+        SELECT id, email, password, role \
         FROM public.user \
         WHERE email=$1 \
         AND deleted_at IS NULL\

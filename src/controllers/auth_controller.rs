@@ -17,6 +17,12 @@ pub struct LoginBody {
     password: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct LoginResponse {
+    email: String,
+    role: Vec<String>,
+}
+
 pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Result<Response, (StatusCode, Json<CustomResponse>)> {
     let user = state.repository
         .find_user_by_email(&body.email)
@@ -63,7 +69,7 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
 
     let response = (
         [(SET_COOKIE, cookie.to_string())], // headers
-        Json(CustomResponse { message: String::from("Successfully logged in !") }) // body
+        Json(LoginResponse{email: user.email, role: user.role}) // body
     ).into_response();
 
     Ok(response)
