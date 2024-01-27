@@ -1,13 +1,10 @@
 use std::sync::Arc;
-use axum::http::{HeaderValue, Method};
-use axum::http::header::CONTENT_TYPE;
 use axum::Router;
 use axum::routing::{delete, get, patch, post};
 use crate::{controllers};
 use crate::controllers::{auth_controller, user_controller};
 use crate::repository::Repository;
 use crate::services::access_control::AccessControl;
-use tower_http::cors::{AllowCredentials, AllowHeaders, Any, CorsLayer};
 use crate::config;
 
 #[derive(Clone)]
@@ -33,7 +30,8 @@ pub async fn serve() -> Router {
         .route("/user/delete", delete(user_controller::hard_delete_user))
         .route("/user/progression", get(user_controller::get_user_progression))
         .route("/login", post(auth_controller::login))
-        .route("/logout", get(auth_controller::logout));
+        .route("/logout", get(auth_controller::logout))
+        .route("/auth/csrf-token", get(auth_controller::get_csrf_token));
 
     Router::new()
         .route("/ping", get(controllers::ping))

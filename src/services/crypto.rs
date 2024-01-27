@@ -1,14 +1,18 @@
 use std::env;
+use std::fmt::Error;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::SaltString;
-use chrono::Utc;
+use chrono::{Local, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header, Algorithm, decode, DecodingKey, Validation};
 use jsonwebtoken::errors::ErrorKind;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub struct HashService;
 pub struct JwtService;
+
+pub struct CSRFTokenService;
 
 impl HashService {
     pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
@@ -72,5 +76,18 @@ impl JwtService {
         ).map(|data| data.claims)
     }
 }
+
+impl CSRFTokenService {
+    pub fn generate_csrf_token() -> Result<String, Error> {
+        let secret = std::env::var("CSRF_SECRET").map_err(|_| Error)?;
+        let ts: String = format!("{}{}", Local::now().timestamp(), secret);
+        let mut hasher = Sha256::new();
+        hasher.update(ts.as_bytes());
+        let hash  = hasher.finalize();
+        Ok(hex::encode(hash))
+    }
+}
+
+
 
 

@@ -8,7 +8,7 @@ use cookie::time::{Duration, OffsetDateTime};
 use serde::{Deserialize, Serialize};
 use crate::api::AppState;
 use crate::controllers::CustomResponse;
-use crate::services::crypto::{HashService, JwtService};
+use crate::services::crypto::{HashService, JwtService, CSRFTokenService};
 use cookie::Cookie;
 
 #[derive(Serialize, Deserialize)]
@@ -69,7 +69,7 @@ pub async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -
 
     let response = (
         [(SET_COOKIE, cookie.to_string())], // headers
-        Json(LoginResponse{email: user.email, role: user.role}) // body
+        Json(LoginResponse { email: user.email, role: user.role }) // body
     ).into_response();
 
     Ok(response)
@@ -187,6 +187,28 @@ pub async fn logout(headers: HeaderMap) -> Result<Response, (StatusCode, Json<Cu
     Ok(response)
 }
 
+pub async fn get_csrf_token() -> Result<Response, (StatusCode, Json<CustomResponse>)> {
+    let token = CSRFTokenService::generate_csrf_token()
+        .map_err(|_| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(CustomResponse {
+                message: String::from("Internal server error"),
+            }),
+        ))?;
+
+    let cookie = Cookie::build(("XSRF-TOKEN", token))
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::Strict)
+        .expires(OffsetDateTime::now_utc())
+        .build();
+
+    let response = ([(SET_COOKIE, cookie.to_string())], Json("{}")).into_response();
+
+    Ok(response)
+}
+
 #[allow(dead_code)]
 pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusCode, Json<CustomResponse>)> {
     let cookie_header = match headers.get("cookie") {
@@ -199,7 +221,7 @@ pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusC
         ))
     };
 
-    let cookie= match cookie_header.to_str() {
+    let cookie = match cookie_header.to_str() {
         Ok(c) => c,
         Err(err) => return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -212,7 +234,7 @@ pub(crate) fn extract_auth_cookie(headers: HeaderMap) -> Result<String, (StatusC
     for cookie in cookie.split(';') {
         if cookie.contains("Authorization") {
             let token = cookie.trim();
-            return Ok(token.to_owned())
+            return Ok(token.to_owned());
         }
     };
 
