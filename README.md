@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 <h1>Rust Authentication service boilerplate</h1>
 
 [![🦀 Rust](https://github.com/hhertout/rs_auth_ms_boilerplate/actions/workflows/rust.yml/badge.svg)](https://github.com/hhertout/rs_auth_ms_boilerplate/actions/workflows/rust.yml)
@@ -7,12 +7,12 @@
 
 
 # Features
--[x] User management
--[x] JWT Authentication with cookie
--[x] JWR Authentication with token
--[x] CSRF token provider
--[x] Docker integration 
--[ ] OAuth
+1. [x] User management
+2. [x] JWT Authentication with cookie
+3. [x] JWR Authentication with token
+4. [x] CSRF token provider
+5. [x] Docker integration 
+6. [ ] OAuth
 
 # Specification
 
