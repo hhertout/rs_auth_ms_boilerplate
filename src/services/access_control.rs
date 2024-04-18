@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 use axum::http::HeaderMap;
-use cookie::{Cookie};
+use cookie::Cookie;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Pool, Postgres};
 use crate::config::roles::Role;
