@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use axum::Router;
 use axum::routing::{delete, get, patch, post};
-use crate::{controllers};
+use crate::controllers;
 use crate::controllers::{auth_controller, user_controller};
 use crate::repository::Repository;
 use crate::services::access_control::AccessControl;
@@ -35,7 +35,7 @@ pub async fn serve() -> Router {
 
     Router::new()
         .route("/ping", get(controllers::ping))
-        .nest("/api", api)
+        .nest("/api/v1", api)
         .layer(config::cors::cors_layer())
         .with_state(state)
 }

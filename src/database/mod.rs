@@ -38,7 +38,7 @@ impl Database for DatabaseService {
     }
 
     async fn create_database(&self) {
-        let db_url = env::var("DB_URL").unwrap();
+        let db_url = env::var("DB_URL").unwrap_or_else(|_| panic!("Error: Database env variable is mandatory"));
         if !Postgres::database_exists(&db_url).await.unwrap_or(false) {
             match Postgres::create_database(&db_url).await {
                 Ok(_) => println!("Database successfully created"),

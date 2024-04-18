@@ -2,7 +2,6 @@ use std::str::FromStr;
 use auth_api::config::roles::Role;
 use auth_api::services::access_control::{AccessControl, Authorization, GrantAccess};
 
-
 #[test]
 #[should_panic]
 pub fn verify_from_role_test() {
