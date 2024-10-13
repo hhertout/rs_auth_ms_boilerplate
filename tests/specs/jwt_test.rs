@@ -1,5 +1,7 @@
 use std::env;
+
 use auth_api::services::crypto::JwtService;
+use auth_api::services::crypto::Jwt;
 
 #[test]
 fn test_generate_jwt_success() {

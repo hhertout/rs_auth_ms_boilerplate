@@ -1,19 +1,25 @@
-use std::io::{Error, ErrorKind};
-use std::str::FromStr;
-use axum::http::HeaderMap;
+use crate::config::roles::Role;
+use crate::controllers::v1::auth_controller::extract_auth_cookie;
+use crate::database::{Database, DatabaseService};
+use crate::services::crypto::JwtService;
+use actix_web::http::header::HeaderValue;
 use cookie::Cookie;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Pool, Postgres};
-use crate::config::roles::Role;
-use crate::controllers::auth_controller::extract_auth_cookie;
-use crate::database::{DatabaseService, Database};
-use crate::services::crypto::JwtService;
+use std::io::{Error, ErrorKind};
+use std::str::FromStr;
+
+use super::crypto::Jwt;
 
 #[allow(async_fn_in_trait)]
 pub trait GrantAccess {
     fn from_role(role: Vec<Role>, granted_roles: Vec<Role>) -> Authorization;
     async fn with_email(&self, email: &str, granted_roles: Vec<Role>) -> Authorization;
-    async fn with_cookie(&self, cookie_header: HeaderMap, granted_roles: Vec<Role>) -> Authorization;
+    async fn with_cookie(
+        &self,
+        cookie_header: Option<&HeaderValue>,
+        granted_roles: Vec<Role>,
+    ) -> Authorization;
 }
 
 pub enum Authorization {
@@ -34,9 +40,7 @@ pub struct AccessControl {
 impl AccessControl {
     pub async fn new() -> AccessControl {
         let pool = DatabaseService::new().database_connection().await;
-        AccessControl {
-            db_pool: pool
-        }
+        AccessControl { db_pool: pool }
     }
 }
 
@@ -58,7 +62,12 @@ impl GrantAccess for AccessControl {
 
         let user_found = match res {
             Ok(user) if user.role.is_some() => user,
-            _ => return Authorization::Unauthorized(Error::new(ErrorKind::InvalidData, "User not found"))
+            _ => {
+                return Authorization::Unauthorized(Error::new(
+                    ErrorKind::InvalidData,
+                    "User not found",
+                ))
+            }
         };
 
         for role in user_found.role.unwrap() {
@@ -68,26 +77,45 @@ impl GrantAccess for AccessControl {
                         return Authorization::Authorized;
                     }
                 }
-                Err(_) => continue
+                Err(_) => continue,
             }
         }
 
         Authorization::Unauthorized(Error::new(ErrorKind::InvalidData, "Unauthorized"))
     }
 
-    async fn with_cookie(&self, cookie_header: HeaderMap, granted_roles: Vec<Role>) -> Authorization {
+    async fn with_cookie(
+        &self,
+        cookie_header: Option<&HeaderValue>,
+        granted_roles: Vec<Role>,
+    ) -> Authorization {
         let cookie = match extract_auth_cookie(cookie_header) {
             Ok(cookie) => cookie,
-            Err(_) => return Authorization::Unauthorized(Error::new(ErrorKind::InvalidData, "Unauthorized"))
+            Err(_) => {
+                return Authorization::Unauthorized(Error::new(
+                    ErrorKind::InvalidData,
+                    "Unauthorized",
+                ))
+            }
         };
         let token = match Cookie::parse(cookie) {
             Ok(cookie) => cookie,
-            Err(_) => return Authorization::Unauthorized(Error::new(ErrorKind::InvalidData, "Unauthorized"))
+            Err(_) => {
+                return Authorization::Unauthorized(Error::new(
+                    ErrorKind::InvalidData,
+                    "Unauthorized",
+                ))
+            }
         };
 
-        let claims = match JwtService::verify_jwt(token.value()) {
+        let claims = match <JwtService as Jwt>::verify_jwt(token.value()) {
             Ok(claims) => claims,
-            Err(_) => return Authorization::Unauthorized(Error::new(ErrorKind::InvalidData, "Unauthorized"))
+            Err(_) => {
+                return Authorization::Unauthorized(Error::new(
+                    ErrorKind::InvalidData,
+                    "Unauthorized",
+                ))
+            }
         };
         self.with_email(&claims.sub, granted_roles).await
     }

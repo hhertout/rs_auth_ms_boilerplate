@@ -1,4 +1,5 @@
 use auth_api::services::crypto::HashService;
+use auth_api::services::crypto::Hash;
 
 #[test]
 fn test_hash_password_success() {

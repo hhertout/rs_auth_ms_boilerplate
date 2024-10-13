@@ -1,31 +1,42 @@
-use axum::Router;
-use tokio::net::TcpListener;
-use auth_api::config;
-use crate::database::{Database, DatabaseService};
+use std::sync::Arc;
 
-mod services;
-mod api;
-mod repository;
+use crate::database::{Database, DatabaseService};
+use actix_web::{web, App, HttpServer};
+use auth_api::config;
+use controllers::{v1::get_v1_service, AppState};
+use log::info;
+use repository::Repository;
+use services::access_control::AccessControl;
+
 mod controllers;
 mod database;
+mod repository;
+mod services;
 
-
-#[tokio::main]
-async fn main() {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     DatabaseService::new().migrations_migrate().await;
 
     config::account::create_super_admin_account().await;
 
+    let state = AppState {
+        repository: Arc::from(Repository::new().await),
+        access_control: Arc::from(AccessControl::new().await),
+    };
+
     let port = std::env::var("PORT").unwrap_or_else(|_| String::from("4000"));
-    let address = "0.0.0.0:".to_owned() + port.as_str();
+    let ipv4 = "0.0.0.0:";
 
-    let app: Router = api::serve().await;
-    let listener = TcpListener::bind(address)
-        .await
-        .unwrap();
+    info!("📡 Server started ! Listening on {}:{}", ipv4, port);
 
-    println!("📡 Server started ! Listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(state.clone()))
+            .service(get_v1_service())
+    })
+    .bind((ipv4, port.parse::<u16>().unwrap()))?
+    .run()
+    .await
 }
