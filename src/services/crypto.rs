@@ -3,7 +3,7 @@ use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{Local, Utc};
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use sha2::digest::block_buffer::Error;
 use sha2::Digest;
@@ -62,14 +62,14 @@ pub trait Jwt {
             exp: (Utc::now().timestamp() + (3600 * 24 * 20)) as u64,
         };
 
-        let header = Header {
+        /* let header = Header {
             kid: Some("signing_key".to_owned()),
             alg: Algorithm::HS512,
             ..Default::default()
-        };
+        }; */
 
         encode(
-            &header,
+            &Header::default(),
             &my_claims,
             &EncodingKey::from_secret(secret.as_bytes()),
         )
@@ -86,7 +86,7 @@ pub trait Jwt {
         decode::<Claims>(
             token,
             &DecodingKey::from_secret(secret.as_bytes()),
-            &Validation::new(Algorithm::HS512),
+            &Validation::default(),
         )
         .map(|data| data.claims)
     }

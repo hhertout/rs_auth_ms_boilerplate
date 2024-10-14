@@ -1,9 +1,6 @@
-FROM rust:1.75
+FROM rust:1.81.0
 
 RUN cargo install cargo-watch
-
-RUN apt-get -y update
-RUN apt-get -y upgrade
 
 WORKDIR /app
 

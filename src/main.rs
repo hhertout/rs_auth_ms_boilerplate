@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::database::{Database, DatabaseService};
 use actix_web::{web, App, HttpServer};
-use auth_api::config;
+use auth_api::{config, controllers::ping};
 use controllers::{v1::get_v1_service, AppState};
 use log::info;
 use repository::Repository;
@@ -27,13 +27,14 @@ async fn main() -> std::io::Result<()> {
     };
 
     let port = std::env::var("PORT").unwrap_or_else(|_| String::from("4000"));
-    let ipv4 = "0.0.0.0:";
+    let ipv4 = "0.0.0.0";
 
     info!("📡 Server started ! Listening on {}:{}", ipv4, port);
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(state.clone()))
+            .service(ping)
             .service(get_v1_service())
     })
     .bind((ipv4, port.parse::<u16>().unwrap()))?

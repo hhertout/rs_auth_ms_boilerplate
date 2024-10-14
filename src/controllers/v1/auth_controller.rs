@@ -23,33 +23,35 @@ pub struct LoginResponse {
 
 #[post("/login")]
 pub async fn login(state: web::Data<AppState>, body: web::Json<LoginBody>) -> impl Responder {
-    let user = state
-        .repository
-        .find_user_by_email(&body.email)
-        .await
-        .map_err(|_| {
-            HttpResponse::BadRequest().json(CustomResponse {
+    let user = match state.repository.find_user_by_email(&body.email).await {
+        Ok(user) => user,
+        Err(err) => {
+            log::error!("{:?}", err);
+            return HttpResponse::BadRequest().json(CustomResponse {
                 message: String::from("Check your information"),
-            })
-        })
-        .unwrap();
+            });
+        }
+    };
 
-    let matching_res = HashService::check_password(&body.password, &user.password)
-        .map_err(|_| {
-            HttpResponse::BadRequest().json(CustomResponse {
+    match HashService::check_password(&body.password, &user.password) {
+        Ok(valid) => {
+            if !valid {
+                return HttpResponse::BadRequest().json(CustomResponse {
+                    message: String::from("Check your information"),
+                });
+            }
+        }
+        Err(err) => {
+            log::error!("{:?}", err);
+            return HttpResponse::BadRequest().json(CustomResponse {
                 message: String::from("Check your information"),
-            })
-        })
-        .unwrap();
-
-    if !matching_res {
-        return HttpResponse::BadRequest().json(CustomResponse {
-            message: String::from("Check your information"),
-        });
-    }
+            });
+        }
+    };
 
     let token = JwtService::generate_jwt(&user.email)
         .map_err(|err| {
+            log::error!("{:?}", err);
             HttpResponse::BadRequest().json(CustomResponse {
                 message: err.to_string(),
             })
@@ -81,52 +83,54 @@ pub struct CheckTokenBody {
 
 #[get("/token/check")]
 pub async fn check_token(state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let token = match extract_auth_cookie(req.headers().get("cookie")) {
-        Ok(t) => t,
-        Err(_) => {
+    let token = match req.headers().get("Authorization") {
+        Some(t) => t,
+        None => {
+            log::error!("No Authorization header found");
             return HttpResponse::Unauthorized().json(CustomResponse {
                 message: String::from("Unauthorized"),
-            })
+            });
         }
     };
 
-    let claims = JwtService::verify_jwt(&token)
-        .map_err(|err| {
-            HttpResponse::Unauthorized().json(CustomResponse {
-                message: err.to_string(),
-            })
-        })
-        .unwrap();
+    let claims = match JwtService::verify_jwt(token.to_str().unwrap()) {
+        Ok(c) => c,
+        Err(err) => {
+            log::error!("{:?}", err);
+            return HttpResponse::Unauthorized().json(CustomResponse {
+                message: format!("JWT verification error: {}", err),
+            });
+        }
+    };
 
-    state
-        .repository
-        .find_user_by_email(&claims.sub)
-        .await
-        .map_err(|_| {
+    match state.repository.find_user_by_email(&claims.sub).await {
+        Ok(_) => HttpResponse::Ok().json(CustomResponse {
+            message: String::from("Authorized"),
+        }),
+        Err(err) => {
+            log::error!("{:?}", err);
             HttpResponse::Unauthorized().json(CustomResponse {
                 message: String::from("Unauthorized"),
             })
-        })
-        .unwrap();
-
-    HttpResponse::Ok().json(CustomResponse {
-        message: String::from("Authorized"),
-    })
+        }
+    }
 }
 
 #[get("/cookie/check")]
 pub async fn check_cookie(state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let cookie = match req.headers().get("Authorization") {
-        Some(c) => c.to_str().unwrap(),
-        None => {
+    let cookie = match extract_auth_cookie(req.headers().get("cookie")) {
+        Ok(c) => c,
+        Err(err) => {
+            log::error!("{:?}", err);
             return HttpResponse::Unauthorized().json(CustomResponse {
                 message: String::from("Unauthorized"),
-            })
+            });
         }
     };
 
     let token = Cookie::parse(cookie)
         .map_err(|err| {
+            log::error!("{:?}", err);
             HttpResponse::InternalServerError().json(CustomResponse {
                 message: err.to_string(),
             })
@@ -135,64 +139,69 @@ pub async fn check_cookie(state: web::Data<AppState>, req: HttpRequest) -> impl 
 
     let claims = JwtService::verify_jwt(token.value())
         .map_err(|err| {
+            log::error!("{:?}", err);
             HttpResponse::Unauthorized().json(CustomResponse {
                 message: err.to_string(),
             })
         })
         .unwrap();
 
-    state
-        .repository
-        .find_user_by_email(&claims.sub)
-        .await
-        .map_err(|_| {
+    match state.repository.find_user_by_email(&claims.sub).await {
+        Ok(_) => HttpResponse::Ok().json(CustomResponse {
+            message: String::from("Authorized"),
+        }),
+        Err(err) => {
+            log::error!("{:?}", err);
             HttpResponse::Unauthorized().json(CustomResponse {
                 message: String::from("Unauthorized"),
             })
-        })
-        .unwrap();
-
-    HttpResponse::Ok().json(CustomResponse {
-        message: String::from("Authorized"),
-    })
+        }
+    }
 }
 
-#[post("/logout")]
+#[get("/logout")]
 pub async fn logout(_: web::Data<AppState>, req: HttpRequest) -> impl Responder {
     let cookie = match extract_auth_cookie(req.headers().get("cookie")) {
         Ok(c) => c,
-        Err(err) => return err,
+        Err(err) => {
+            log::error!("{:?}", err);
+            return HttpResponse::BadRequest().json(CustomResponse {
+                message: String::from("No cookie provided"),
+            });
+        }
     };
 
-    let token = Cookie::parse(cookie)
-        .map_err(|err| {
-            HttpResponse::InternalServerError().json(CustomResponse {
+    match Cookie::parse(cookie) {
+        Ok(token) => match JwtService::verify_jwt(token.value()) {
+            Ok(_) => {
+                let cookie = Cookie::build(("Authorization", ""))
+                    .path("/")
+                    .secure(true)
+                    .http_only(true)
+                    .same_site(SameSite::Strict)
+                    .expires(OffsetDateTime::now_utc())
+                    .build();
+
+                HttpResponse::Ok()
+                    .append_header((SET_COOKIE, cookie.to_string()))
+                    .json(CustomResponse {
+                        message: String::from("Successfully logged out!"),
+                    })
+            }
+            Err(err) => {
+                log::error!("{:?}", err);
+                return HttpResponse::Unauthorized().json(CustomResponse {
+                    message: err.to_string(),
+                });
+            }
+        },
+        Err(err) => {
+            log::error!("{:?}", err);
+            return HttpResponse::InternalServerError().json(CustomResponse {
                 message: err.to_string(),
-            })
-        })
-        .unwrap();
-
-    JwtService::verify_jwt(token.value())
-        .map_err(|err| {
-            HttpResponse::Unauthorized().json(CustomResponse {
-                message: err.to_string(),
-            })
-        })
-        .unwrap();
-
-    let cookie = Cookie::build(("Authorization", ""))
-        .path("/")
-        .secure(true)
-        .http_only(true)
-        .same_site(SameSite::Strict)
-        .expires(OffsetDateTime::now_utc())
-        .build();
-
-    HttpResponse::Ok()
-        .append_header((SET_COOKIE, cookie.to_string()))
-        .json(CustomResponse {
-            message: String::from("Successfully logged out!"),
-        })
+            });
+        }
+    }
 }
 
 #[get("/csrf-token")]

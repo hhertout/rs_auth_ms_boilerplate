@@ -1,7 +1,7 @@
+use crate::repository::Repository;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, FromRow};
-use crate::repository::Repository;
 
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct User {
@@ -28,7 +28,7 @@ pub struct NewUserResponse {
 #[derive(FromRow, Serialize, Deserialize)]
 pub struct UserProgression {
     pub(crate) creation_date: NaiveDate,
-    pub(crate) incr_count: i32
+    pub(crate) incr_count: i32,
 }
 
 impl Repository {
@@ -38,37 +38,41 @@ impl Repository {
             INSERT INTO public.user (email, password, role) \
             VALUES ($1, $2, $3)\
             RETURNING id, created_at, updated_at, deleted_at, email, role;\
-            "
+            ",
         )
-            .bind(user.email)
-            .bind(user.password)
-            .bind(user.role)
-            .fetch_one(&self.db_pool)
-            .await
+        .bind(user.email)
+        .bind(user.password)
+        .bind(user.role)
+        .fetch_one(&self.db_pool)
+        .await
     }
 
     pub async fn find_user_by_email(&self, email: &str) -> Result<User, Error> {
-        sqlx::query_as::<_, User>("\
+        sqlx::query_as::<_, User>(
+            "\
         SELECT id, email, password, role \
         FROM public.user \
         WHERE email=$1 \
         AND deleted_at IS NULL\
-        ")
-            .bind(email)
-            .fetch_one(&self.db_pool)
-            .await
+        ",
+        )
+        .bind(email)
+        .fetch_one(&self.db_pool)
+        .await
     }
 
     pub async fn find_banned_user_by_email(&self, email: &str) -> Result<User, Error> {
-        sqlx::query_as::<_, User>("\
+        sqlx::query_as::<_, User>(
+            "\
         SELECT id, email, password \
         FROM public.user \
         WHERE email=$1 \
         AND deleted_at IS NOT NULL\
-        ")
-            .bind(email)
-            .fetch_one(&self.db_pool)
-            .await
+        ",
+        )
+        .bind(email)
+        .fetch_one(&self.db_pool)
+        .await
     }
 
     pub async fn update_user_password(&self, user_id: &str, password: &str) -> Result<(), Error> {
@@ -88,6 +92,13 @@ impl Repository {
             .await?;
 
         self.is_row_affected(res.rows_affected(), 1)
+    }
+
+    pub async fn get_delete_user_by_email(&self, email: &str)-> Result<User, Error> {
+        sqlx::query_as::<_, User>("SELECT * FROM public.user WHERE email=$1 AND deleted_at is not null")
+            .bind(email)
+            .fetch_one(&self.db_pool)
+        .await
     }
 
     pub async fn remove_soft_deletion_user(&self, id: &str) -> Result<(), Error> {

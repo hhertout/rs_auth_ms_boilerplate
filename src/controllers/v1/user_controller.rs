@@ -13,6 +13,23 @@ pub struct NewUserBody {
     password: String,
 }
 
+#[get("/user/ban/{email}")]
+pub async fn get_ban_user_by_email(
+    state: web::Data<AppState>,
+    email: web::Path<String>,
+) -> impl Responder {
+    if email.as_str() == "" {
+        return HttpResponse::BadRequest().json(CustomResponse {
+            message: String::from("route cannot be empty"),
+        });
+    };
+
+    match state.repository.get_delete_user_by_email(&email).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+    }
+}
+
 #[post("/user")]
 pub async fn save_user(state: web::Data<AppState>, body: web::Json<NewUserBody>) -> impl Responder {
     let hash = HashService::hash_password(&body.password)
@@ -54,14 +71,20 @@ pub struct UserResponse {
     email: String,
 }
 
-#[get("/user")]
+#[get("/user/{email}")]
 pub async fn get_user_by_email(
     state: web::Data<AppState>,
-    body: web::Json<GetUserEmailBody>,
+    email: web::Path<String>,
 ) -> impl Responder {
+    if email.as_str() == "" {
+        return HttpResponse::BadRequest().json(CustomResponse {
+            message: String::from("route cannot be empty"),
+        });
+    };
+
     let user = state
         .repository
-        .find_user_by_email(&body.email)
+        .find_user_by_email(&email)
         .await
         .map_err(|err| {
             HttpResponse::InternalServerError().json(CustomResponse {
